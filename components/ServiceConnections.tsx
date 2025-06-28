@@ -44,15 +44,21 @@ export default function ServiceConnections() {
   // Check actual connection status with proxy
   async function checkConnectionStatus() {
     const sessionId = localStorage.getItem('aniccaSessionId')
+    console.log('🔍 Checking connection status with sessionId:', sessionId)
     if (!sessionId) return
     
     try {
       const response = await fetch(`https://anicca-proxy-production.up.railway.app/api/slack/check-connection?sessionId=${sessionId}`)
+      console.log('📡 Check connection response status:', response.status)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('📊 Connection check data:', data)
+        
         setServices(prev => prev.map(service => {
           if (service.id === 'slack') {
             const isConnected = data.connected === true
+            console.log('🟢 Slack connection status:', isConnected)
             // Update localStorage to match server state
             if (isConnected) {
               localStorage.setItem(`anicca_slack_connected`, 'true')
@@ -63,6 +69,8 @@ export default function ServiceConnections() {
           }
           return service
         }))
+      } else {
+        console.error('❌ Check connection failed with status:', response.status)
       }
     } catch (error) {
       console.error('Failed to check connection status:', error)
