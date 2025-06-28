@@ -10,6 +10,13 @@ export default function Home() {
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
+  
+  // Generate session ID
+  function generateSessionId() {
+    const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+    localStorage.setItem('aniccaSessionId', sessionId)
+    return sessionId
+  }
 
   // WebRTCセッションを開始
   async function startVoiceSession() {
@@ -17,8 +24,9 @@ export default function Home() {
       // Starting voice session...
       setStatus('connecting')
       
-      // Get session from proxy
-      const sessionUrl = 'https://anicca-proxy-production.up.railway.app/api/openai-proxy/session'
+      // Get session from proxy with sessionId
+      const sessionId = localStorage.getItem('aniccaSessionId') || generateSessionId();
+      const sessionUrl = `https://anicca-proxy-production.up.railway.app/api/openai-proxy/session?sessionId=${sessionId}`
       const sessionResponse = await fetch(sessionUrl)
       const session = await sessionResponse.json()
       // Session received

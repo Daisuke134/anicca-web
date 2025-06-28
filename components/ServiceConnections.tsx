@@ -20,7 +20,7 @@ export default function ServiceConnections() {
   ])
   const [loading, setLoading] = useState(false)
 
-  // Check if returning from OAuth
+  // Check connection status on mount and after OAuth
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     if (urlParams.get('success') === 'true') {
@@ -37,12 +37,42 @@ export default function ServiceConnections() {
       window.history.replaceState({}, document.title, window.location.pathname)
     }
     
-    // Check localStorage for connection status
-    setServices(prev => prev.map(service => ({
-      ...service,
-      connected: localStorage.getItem(`anicca_${service.id}_connected`) === 'true'
-    })))
+    // Verify actual connection status with proxy
+    checkConnectionStatus()
   }, [])
+  
+  // Check actual connection status with proxy
+  async function checkConnectionStatus() {
+    const sessionId = localStorage.getItem('aniccaSessionId')
+    if (!sessionId) return
+    
+    try {
+      const response = await fetch(`https://anicca-proxy-production.up.railway.app/api/slack/check-connection?sessionId=${sessionId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setServices(prev => prev.map(service => {
+          if (service.id === 'slack') {
+            const isConnected = data.connected === true
+            // Update localStorage to match server state
+            if (isConnected) {
+              localStorage.setItem(`anicca_slack_connected`, 'true')
+            } else {
+              localStorage.removeItem(`anicca_slack_connected`)
+            }
+            return { ...service, connected: isConnected }
+          }
+          return service
+        }))
+      }
+    } catch (error) {
+      console.error('Failed to check connection status:', error)
+      // Fallback to localStorage
+      setServices(prev => prev.map(service => ({
+        ...service,
+        connected: localStorage.getItem(`anicca_${service.id}_connected`) === 'true'
+      })))
+    }
+  }
 
   async function connectService(serviceId: string) {
     if (!services.find(s => s.id === serviceId)?.available) return
