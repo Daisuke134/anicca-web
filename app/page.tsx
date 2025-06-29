@@ -5,7 +5,7 @@ import VoiceVisualizer from '@/components/VoiceVisualizer'
 import ServiceConnections from '@/components/ServiceConnections'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/hooks/useAuth'
-import { authenticatedFetch } from '@/lib/api-client'
+// import { authenticatedFetch } from '@/lib/api-client'
 
 export default function Home() {
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle')
@@ -29,7 +29,7 @@ export default function Home() {
         : `${proxyUrl}/api/openai-proxy/session`
       
       console.log('🎯 startVoiceSession: Fetching session from:', sessionUrl)
-      const sessionResponse = await authenticatedFetch(sessionUrl)
+      const sessionResponse = await fetch(sessionUrl)
       
       if (!sessionResponse.ok) {
         const errorText = await sessionResponse.text()
@@ -150,7 +150,7 @@ export default function Home() {
         };
       }
       
-      const response = await authenticatedFetch(toolsUrl, {
+      const response = await fetch(toolsUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)

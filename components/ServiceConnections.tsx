@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
-import { authenticatedFetch } from '@/lib/api-client'
+// import { authenticatedFetch } from '@/lib/api-client'
 
 interface Service {
   id: string
@@ -56,7 +56,7 @@ export default function ServiceConnections() {
       const params = `userId=${userId}`
       
       const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
-      const response = await authenticatedFetch(`${proxyUrl}/api/slack/check-connection?${params}`)
+      const response = await fetch(`${proxyUrl}/api/slack/check-connection?${params}`)
       console.log('📡 Check connection response status:', response.status)
       
       if (response.ok) {
@@ -110,7 +110,7 @@ export default function ServiceConnections() {
       // Slack専用のOAuthエンドポイントを使用
       if (serviceId === 'slack') {
         const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
-        const response = await authenticatedFetch(`${proxyUrl}/api/slack/oauth-url?${params}`, {
+        const response = await fetch(`${proxyUrl}/api/slack/oauth-url?${params}`, {
           method: 'GET'
         })
         

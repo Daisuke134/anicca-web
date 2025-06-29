@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase'
-import { authenticatedFetch } from '@/lib/api-client'
+// import { authenticatedFetch } from '@/lib/api-client'
 
 // localStorageのデータをSupabaseに移行
 export async function migrateLocalDataToSupabase(userId: string) {
@@ -17,7 +17,7 @@ export async function migrateLocalDataToSupabase(userId: string) {
       
       // 3. プロキシサーバーに移行リクエストを送信
       const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
-      const response = await authenticatedFetch(`${proxyUrl}/api/migrate-connection`, {
+      const response = await fetch(`${proxyUrl}/api/migrate-connection`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
