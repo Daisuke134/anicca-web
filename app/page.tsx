@@ -19,7 +19,7 @@ export default function Home() {
   // WebRTCセッションを開始
   async function startVoiceSession() {
     try {
-      // Starting voice session...
+      console.log('🎯 startVoiceSession: Starting with user:', user?.email)
       setStatus('connecting')
       
       // Get session from proxy with userId
@@ -27,9 +27,18 @@ export default function Home() {
       const sessionUrl = user?.id 
         ? `${proxyUrl}/api/openai-proxy/session?userId=${user.id}`
         : `${proxyUrl}/api/openai-proxy/session`
+      
+      console.log('🎯 startVoiceSession: Fetching session from:', sessionUrl)
       const sessionResponse = await authenticatedFetch(sessionUrl)
+      
+      if (!sessionResponse.ok) {
+        const errorText = await sessionResponse.text()
+        console.error('🎯 startVoiceSession: Session fetch failed:', sessionResponse.status, errorText)
+        throw new Error(`Session fetch failed: ${sessionResponse.status}`)
+      }
+      
       const session = await sessionResponse.json()
-      // Session received
+      console.log('🎯 startVoiceSession: Session received:', session.client_secret ? 'with secret' : 'no secret')
       
       // Set up WebRTC
       pcRef.current = new RTCPeerConnection()
@@ -105,6 +114,10 @@ export default function Home() {
       
     } catch (error) {
       console.error('❌ Failed to start voice session:', error)
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      })
       setError(error instanceof Error ? error.message : 'Failed to connect')
       setStatus('error')
     }
