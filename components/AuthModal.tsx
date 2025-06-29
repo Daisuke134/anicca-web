@@ -9,40 +9,11 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const { signIn, signUp, signInWithGoogle } = useAuth()
+  const { signInWithGoogle } = useAuth()
 
   if (!isOpen) return null
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    try {
-      const { error } = isSignUp 
-        ? await signUp(email, password)
-        : await signIn(email, password)
-
-      if (error) {
-        setError(error.message)
-      } else {
-        onClose()
-        // サインアップの場合はメール確認のメッセージを表示
-        if (isSignUp) {
-          alert('確認メールを送信しました。メールを確認してください。')
-        }
-      }
-    } catch (err) {
-      setError('エラーが発生しました')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleGoogleLogin = async () => {
     setError(null)
@@ -84,69 +55,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         {error && (
           <div className="text-red-500 text-sm mt-4">{error}</div>
         )}
-
-        {/* 区切り線 */}
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-600"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-gray-900 text-gray-400">or</span>
-          </div>
-        </div>
-
-        {/* メールでのログイン（折りたたみ） */}
-        <details className="text-gray-400">
-          <summary className="cursor-pointer hover:text-white text-sm">Sign in with email</summary>
-          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
-                メールアドレス
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-3 py-2 bg-gray-800 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
-                パスワード
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-3 py-2 bg-gray-800 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? '処理中...' : (isSignUp ? 'アカウント作成' : 'ログイン')}
-            </button>
-            
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-blue-400 hover:underline text-sm"
-              >
-                {isSignUp ? 'ログインに切り替え' : 'アカウントを作成'}
-              </button>
-            </div>
-          </form>
-        </details>
 
         <button
           onClick={onClose}
