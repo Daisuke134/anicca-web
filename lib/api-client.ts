@@ -39,7 +39,9 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
   // Merge headers properly
   const headers = new Headers(options.headers)
   Object.entries(authHeaders).forEach(([key, value]) => {
-    if (value) headers.set(key, value)
+    if (value && typeof value === 'string') {
+      headers.set(key, value)
+    }
   })
   
   console.log('🌐 authenticatedFetch: Making request with headers:', {
