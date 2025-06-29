@@ -145,8 +145,15 @@ export default function Home() {
       } else {
         const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
         toolsUrl = `${proxyUrl}/api/tools/${name}`;
+        
+        // think_with_claudeの場合はuserIDを追加
+        const parsedArgs = JSON.parse(args);
+        if (name === 'think_with_claude' && user?.id) {
+          parsedArgs.userId = user.id;
+        }
+        
         requestBody = {
-          arguments: JSON.parse(args)
+          arguments: parsedArgs
         };
       }
       
