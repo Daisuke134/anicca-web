@@ -5,6 +5,7 @@ import VoiceVisualizer from '@/components/VoiceVisualizer'
 import ServiceConnections from '@/components/ServiceConnections'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/hooks/useAuth'
+import { authenticatedFetch } from '@/lib/api-client'
 
 export default function Home() {
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle')
@@ -14,13 +15,6 @@ export default function Home() {
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
   const { user, loading } = useAuth()
-  
-  // Generate session ID
-  function generateSessionId() {
-    const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem('aniccaSessionId', sessionId)
-    return sessionId
-  }
 
   // WebRTCセッションを開始
   async function startVoiceSession() {
@@ -28,10 +22,12 @@ export default function Home() {
       // Starting voice session...
       setStatus('connecting')
       
-      // Get session from proxy with sessionId
-      const sessionId = localStorage.getItem('aniccaSessionId') || generateSessionId();
-      const sessionUrl = `https://anicca-proxy-production.up.railway.app/api/openai-proxy/session?sessionId=${sessionId}`
-      const sessionResponse = await fetch(sessionUrl)
+      // Get session from proxy with userId
+      const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
+      const sessionUrl = user?.id 
+        ? `${proxyUrl}/api/openai-proxy/session?userId=${user.id}`
+        : `${proxyUrl}/api/openai-proxy/session`
+      const sessionResponse = await authenticatedFetch(sessionUrl)
       const session = await sessionResponse.json()
       // Session received
       
@@ -126,20 +122,22 @@ export default function Home() {
       let requestBody;
       
       if (name.startsWith('slack_')) {
-        toolsUrl = 'https://anicca-proxy-production.up.railway.app/api/tools/slack';
+        const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
+        toolsUrl = `${proxyUrl}/api/tools/slack`;
         const parsedArgs = JSON.parse(args);
         requestBody = {
           action: name.replace('slack_', ''), // slack_send_message -> send_message
           arguments: parsedArgs
         };
       } else {
-        toolsUrl = `https://anicca-proxy-production.up.railway.app/api/tools/${name}`;
+        const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
+        toolsUrl = `${proxyUrl}/api/tools/${name}`;
         requestBody = {
           arguments: JSON.parse(args)
         };
       }
       
-      const response = await fetch(toolsUrl, {
+      const response = await authenticatedFetch(toolsUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)

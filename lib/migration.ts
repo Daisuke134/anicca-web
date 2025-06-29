@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase'
+import { authenticatedFetch } from '@/lib/api-client'
 
 // localStorageのデータをSupabaseに移行
 export async function migrateLocalDataToSupabase(userId: string) {
@@ -15,7 +16,8 @@ export async function migrateLocalDataToSupabase(userId: string) {
       console.log('🔄 Migrating Slack connection to user account...')
       
       // 3. プロキシサーバーに移行リクエストを送信
-      const response = await fetch('https://anicca-proxy-production.up.railway.app/api/migrate-connection', {
+      const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
+      const response = await authenticatedFetch(`${proxyUrl}/api/migrate-connection`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -29,8 +31,14 @@ export async function migrateLocalDataToSupabase(userId: string) {
       
       if (response.ok) {
         console.log('✅ Slack connection migrated successfully')
-        // 移行成功後、localStorageをクリーンアップ（オプション）
-        // localStorage.removeItem('anicca_slack_connected')
+        // 移行成功後、localStorageをクリーンアップ
+        localStorage.removeItem('anicca_slack_connected')
+        localStorage.removeItem('aniccaSessionId')
+      } else if (response.status === 404) {
+        // 古いセッションが見つからない場合は、単にクリーンアップ
+        console.log('⚠️ Old session not found, cleaning up localStorage')
+        localStorage.removeItem('anicca_slack_connected')
+        localStorage.removeItem('aniccaSessionId')
       } else {
         console.error('❌ Failed to migrate Slack connection')
       }
