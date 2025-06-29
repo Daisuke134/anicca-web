@@ -3,13 +3,17 @@
 import { useState, useEffect, useRef } from 'react'
 import VoiceVisualizer from '@/components/VoiceVisualizer'
 import ServiceConnections from '@/components/ServiceConnections'
+import AuthModal from '@/components/AuthModal'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function Home() {
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
+  const { user, loading } = useAuth()
   
   // Generate session ID
   function generateSessionId() {
@@ -166,24 +170,48 @@ export default function Home() {
     }
   }
   
-  // 自動的に開始
+  // 自動的に開始（ログインしている場合のみ）
   useEffect(() => {
-    const timer = setTimeout(() => {
-      startVoiceSession()
-    }, 1000)
-    
-    return () => {
-      clearTimeout(timer)
-      if (pcRef.current) {
-        pcRef.current.close()
+    if (!loading && user) {
+      const timer = setTimeout(() => {
+        startVoiceSession()
+      }, 1000)
+      
+      return () => {
+        clearTimeout(timer)
+        if (pcRef.current) {
+          pcRef.current.close()
+        }
       }
     }
-  }, [])
+  }, [loading, user])
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center relative">
       {/* Service connections in top right */}
       <ServiceConnections />
+      
+      {/* User info in top left */}
+      <div className="absolute top-4 left-4 flex items-center gap-4">
+        {user ? (
+          <>
+            <span className="text-white text-sm">{user.email}</span>
+            <button
+              onClick={() => window.location.href = '/auth/signout'}
+              className="text-gray-400 hover:text-white text-sm"
+            >
+              Sign out
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+          >
+            Sign in
+          </button>
+        )}
+      </div>
       
       <div className="flex flex-col items-center gap-8">
         {/* 音声波形表示エリア */}
@@ -194,12 +222,24 @@ export default function Home() {
 
         {/* ステータス表示 */}
         <div className="text-white text-lg">
-          {error && <span className="text-red-500">{error}</span>}
-          {!error && status === 'idle' && 'Starting...'}
-          {!error && status === 'connecting' && 'Connecting...'}
-          {!error && status === 'connected' && 'Listening...'}
+          {!user && !loading && (
+            <p className="text-gray-400">Sign in to get started</p>
+          )}
+          {user && (
+            <>
+              {error && <span className="text-red-500">{error}</span>}
+              {!error && status === 'idle' && 'Starting...'}
+              {!error && status === 'connecting' && 'Connecting...'}
+              {!error && status === 'connected' && 'Listening...'}
+            </>
+          )}
         </div>
       </div>
+      
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </div>
   )
 }

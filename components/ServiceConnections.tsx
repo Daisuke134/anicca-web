@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Service {
   id: string
@@ -19,6 +20,7 @@ export default function ServiceConnections() {
     { id: 'gmail', name: 'Gmail', icon: '', connected: false, available: false },
   ])
   const [loading, setLoading] = useState(false)
+  const { user } = useAuth()
 
   // Check connection status on mount and after OAuth
   useEffect(() => {
@@ -39,16 +41,23 @@ export default function ServiceConnections() {
     
     // Verify actual connection status with proxy
     checkConnectionStatus()
-  }, [])
+  }, [user]) // userが変更されたら再チェック
   
   // Check actual connection status with proxy
   async function checkConnectionStatus() {
     const sessionId = localStorage.getItem('aniccaSessionId')
-    console.log('🔍 Checking connection status with sessionId:', sessionId)
-    if (!sessionId) return
+    const userId = user?.id
+    console.log('🔍 Checking connection status with userId:', userId, 'sessionId:', sessionId)
+    
+    if (!userId && !sessionId) return
     
     try {
-      const response = await fetch(`https://anicca-proxy-production.up.railway.app/api/slack/check-connection?sessionId=${sessionId}`)
+      // ユーザーIDを優先的に使用
+      const params = userId 
+        ? `userId=${userId}` 
+        : `sessionId=${sessionId}`
+      
+      const response = await fetch(`https://anicca-proxy-production.up.railway.app/api/slack/check-connection?${params}`)
       console.log('📡 Check connection response status:', response.status)
       
       if (response.ok) {
