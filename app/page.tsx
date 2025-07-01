@@ -3,33 +3,42 @@
 import { useState, useEffect, useRef } from 'react'
 import VoiceVisualizer from '@/components/VoiceVisualizer'
 import ServiceConnections from '@/components/ServiceConnections'
+import AuthModal from '@/components/AuthModal'
+import { useAuth } from '@/hooks/useAuth'
+// import { authenticatedFetch } from '@/lib/api-client'
 
 export default function Home() {
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
-  
-  // Generate session ID
-  function generateSessionId() {
-    const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem('aniccaSessionId', sessionId)
-    return sessionId
-  }
+  const { user, loading } = useAuth()
 
   // WebRTCセッションを開始
   async function startVoiceSession() {
     try {
-      // Starting voice session...
+      console.log('🎯 startVoiceSession: Starting with user:', user?.email)
       setStatus('connecting')
       
-      // Get session from proxy with sessionId
-      const sessionId = localStorage.getItem('aniccaSessionId') || generateSessionId();
-      const sessionUrl = `https://anicca-proxy-production.up.railway.app/api/openai-proxy/session?sessionId=${sessionId}`
+      // Get session from proxy with userId
+      const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
+      const sessionUrl = user?.id 
+        ? `${proxyUrl}/api/openai-proxy/session?userId=${user.id}`
+        : `${proxyUrl}/api/openai-proxy/session`
+      
+      console.log('🎯 startVoiceSession: Fetching session from:', sessionUrl)
       const sessionResponse = await fetch(sessionUrl)
+      
+      if (!sessionResponse.ok) {
+        const errorText = await sessionResponse.text()
+        console.error('🎯 startVoiceSession: Session fetch failed:', sessionResponse.status, errorText)
+        throw new Error(`Session fetch failed: ${sessionResponse.status}`)
+      }
+      
       const session = await sessionResponse.json()
-      // Session received
+      console.log('🎯 startVoiceSession: Session received:', session.client_secret ? 'with secret' : 'no secret')
       
       // Set up WebRTC
       pcRef.current = new RTCPeerConnection()
@@ -105,6 +114,10 @@ export default function Home() {
       
     } catch (error) {
       console.error('❌ Failed to start voice session:', error)
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      })
       setError(error instanceof Error ? error.message : 'Failed to connect')
       setStatus('error')
     }
@@ -114,6 +127,13 @@ export default function Home() {
   async function handleFunctionCall(data: any) {
     const { call_id, name, arguments: args } = data
     
+    console.log('🛠️ [Anicca] Tool call received:', {
+      name: name,
+      args: args,
+      hasUser: !!user,
+      userId: user?.id
+    })
+    
     try {
       // Tool call: ${name}
       
@@ -122,18 +142,38 @@ export default function Home() {
       let requestBody;
       
       if (name.startsWith('slack_')) {
-        toolsUrl = 'https://anicca-proxy-production.up.railway.app/api/tools/slack';
+        const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
+        toolsUrl = `${proxyUrl}/api/tools/slack`;
         const parsedArgs = JSON.parse(args);
         requestBody = {
           action: name.replace('slack_', ''), // slack_send_message -> send_message
           arguments: parsedArgs
         };
       } else {
-        toolsUrl = `https://anicca-proxy-production.up.railway.app/api/tools/${name}`;
+        const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
+        toolsUrl = `${proxyUrl}/api/tools/${name}`;
+        
+        // claude_codeの場合はuserIDを追加
+        const parsedArgs = JSON.parse(args);
+        if (name === 'claude_code' && user?.id) {
+          parsedArgs.userId = user.id;
+          console.log('🎯 [Anicca] Adding userId to claude_code:', {
+            userId: user.id,
+            originalArgs: args,
+            modifiedArgs: parsedArgs
+          })
+        }
+        
         requestBody = {
-          arguments: JSON.parse(args)
+          arguments: parsedArgs
         };
       }
+      
+      console.log('📤 [Anicca] Sending request to:', {
+        url: toolsUrl,
+        body: requestBody,
+        hasUserId: !!requestBody.arguments?.userId
+      })
       
       const response = await fetch(toolsUrl, {
         method: 'POST',
@@ -166,24 +206,48 @@ export default function Home() {
     }
   }
   
-  // 自動的に開始
+  // 自動的に開始（ログインしている場合のみ）
   useEffect(() => {
-    const timer = setTimeout(() => {
-      startVoiceSession()
-    }, 1000)
-    
-    return () => {
-      clearTimeout(timer)
-      if (pcRef.current) {
-        pcRef.current.close()
+    if (!loading && user) {
+      const timer = setTimeout(() => {
+        startVoiceSession()
+      }, 1000)
+      
+      return () => {
+        clearTimeout(timer)
+        if (pcRef.current) {
+          pcRef.current.close()
+        }
       }
     }
-  }, [])
+  }, [loading, user])
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center relative">
       {/* Service connections in top right */}
       <ServiceConnections />
+      
+      {/* User info in top left */}
+      <div className="absolute top-4 left-4 flex items-center gap-4">
+        {user ? (
+          <>
+            <span className="text-white text-sm">{user.email}</span>
+            <button
+              onClick={() => window.location.href = '/auth/signout'}
+              className="text-gray-400 hover:text-white text-sm"
+            >
+              Sign out
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+          >
+            Sign in
+          </button>
+        )}
+      </div>
       
       <div className="flex flex-col items-center gap-8">
         {/* 音声波形表示エリア */}
@@ -194,12 +258,24 @@ export default function Home() {
 
         {/* ステータス表示 */}
         <div className="text-white text-lg">
-          {error && <span className="text-red-500">{error}</span>}
-          {!error && status === 'idle' && 'Starting...'}
-          {!error && status === 'connecting' && 'Connecting...'}
-          {!error && status === 'connected' && 'Listening...'}
+          {!user && !loading && (
+            <p className="text-gray-400">Sign in to get started</p>
+          )}
+          {user && (
+            <>
+              {error && <span className="text-red-500">{error}</span>}
+              {!error && status === 'idle' && 'Starting...'}
+              {!error && status === 'connecting' && 'Connecting...'}
+              {!error && status === 'connected' && 'Listening...'}
+            </>
+          )}
         </div>
       </div>
+      
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </div>
   )
 }

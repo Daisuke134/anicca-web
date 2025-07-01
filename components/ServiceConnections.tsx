@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import { useAuth } from '@/hooks/useAuth'
+// import { authenticatedFetch } from '@/lib/api-client'
 
 interface Service {
   id: string
@@ -19,6 +21,7 @@ export default function ServiceConnections() {
     { id: 'gmail', name: 'Gmail', icon: '', connected: false, available: false },
   ])
   const [loading, setLoading] = useState(false)
+  const { user } = useAuth()
 
   // Check connection status on mount and after OAuth
   useEffect(() => {
@@ -39,20 +42,31 @@ export default function ServiceConnections() {
     
     // Verify actual connection status with proxy
     checkConnectionStatus()
-  }, [])
+  }, [user]) // userが変更されたら再チェック
   
   // Check actual connection status with proxy
   async function checkConnectionStatus() {
-    const sessionId = localStorage.getItem('aniccaSessionId')
-    if (!sessionId) return
+    const userId = user?.id
+    console.log('🔍 Checking connection status with userId:', userId)
+    
+    if (!userId) return
     
     try {
-      const response = await fetch(`https://anicca-proxy-production.up.railway.app/api/slack/check-connection?sessionId=${sessionId}`)
+      // ユーザーIDのみ使用
+      const params = `userId=${userId}`
+      
+      const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
+      const response = await fetch(`${proxyUrl}/api/slack/check-connection?${params}`)
+      console.log('📡 Check connection response status:', response.status)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('📊 Connection check data:', data)
+        
         setServices(prev => prev.map(service => {
           if (service.id === 'slack') {
             const isConnected = data.connected === true
+            console.log('🟢 Slack connection status:', isConnected)
             // Update localStorage to match server state
             if (isConnected) {
               localStorage.setItem(`anicca_slack_connected`, 'true')
@@ -63,6 +77,8 @@ export default function ServiceConnections() {
           }
           return service
         }))
+      } else {
+        console.error('❌ Check connection failed with status:', response.status)
       }
     } catch (error) {
       console.error('Failed to check connection status:', error)
@@ -80,14 +96,21 @@ export default function ServiceConnections() {
     setLoading(true)
     try {
       // Get OAuth URL from proxy
-      const sessionId = localStorage.getItem('aniccaSessionId') || generateSessionId();
+      if (!user?.id) {
+        console.error('User not logged in')
+        return
+      }
+      
       const params = new URLSearchParams({
-        sessionId: sessionId
+        userId: user.id,
+        // 一時的なセッションIDを生成（OAuthフロー用）
+        sessionId: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       });
       
       // Slack専用のOAuthエンドポイントを使用
       if (serviceId === 'slack') {
-        const response = await fetch(`https://anicca-proxy-production.up.railway.app/api/slack/oauth-url?${params}`, {
+        const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://anicca-proxy-production.up.railway.app'
+        const response = await fetch(`${proxyUrl}/api/slack/oauth-url?${params}`, {
           method: 'GET'
         })
         
@@ -106,11 +129,6 @@ export default function ServiceConnections() {
     }
   }
 
-  function generateSessionId() {
-    const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    localStorage.setItem('aniccaSessionId', sessionId)
-    return sessionId
-  }
 
   return (
     <div className="fixed top-4 right-4 flex gap-2 z-50">
