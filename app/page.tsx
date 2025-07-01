@@ -127,6 +127,13 @@ export default function Home() {
   async function handleFunctionCall(data: any) {
     const { call_id, name, arguments: args } = data
     
+    console.log('🛠️ [Anicca] Tool call received:', {
+      name: name,
+      args: args,
+      hasUser: !!user,
+      userId: user?.id
+    })
+    
     try {
       // Tool call: ${name}
       
@@ -150,12 +157,23 @@ export default function Home() {
         const parsedArgs = JSON.parse(args);
         if (name === 'claude_code' && user?.id) {
           parsedArgs.userId = user.id;
+          console.log('🎯 [Anicca] Adding userId to claude_code:', {
+            userId: user.id,
+            originalArgs: args,
+            modifiedArgs: parsedArgs
+          })
         }
         
         requestBody = {
           arguments: parsedArgs
         };
       }
+      
+      console.log('📤 [Anicca] Sending request to:', {
+        url: toolsUrl,
+        body: requestBody,
+        hasUserId: !!requestBody.arguments?.userId
+      })
       
       const response = await fetch(toolsUrl, {
         method: 'POST',
